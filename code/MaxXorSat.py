@@ -1,19 +1,19 @@
-import numpy as np
 import itertools
 
-class MaxXorSat:
+import numpy as np
 
-    def __init__(self, n  , m , A, b):
+
+class MaxXorSat:
+    def __init__(self, n, m, A, b):
         try:
             # A taille nxm
-            if (len(A) != n):
+            if len(A) != n:
                 raise ValueError("A n'a pas n lignes")
-            if (len(A[0]) != m):
+            if len(A[0]) != m:
                 raise ValueError("A n'a pas m colonnes")
 
-
             # b taille nx1
-            if(len(b) != n):
+            if len(b) != n:
                 raise ValueError("b n'a pas n lignes")
 
             self.n = n
@@ -25,15 +25,14 @@ class MaxXorSat:
             exit(0)
 
 
-
-#retourne la solution qui maximise et utilité = nombre d'égalité vérifié
+# retourne la solution qui maximise et utilité = nombre d'égalité vérifié
 def solve(entry: MaxXorSat):
     """
     Solveur Basique naif par énumération
 
     Args:
         entry: Instance de MaxXorSat
-    
+
     Returns:
         (best_solution, max_utilite)
 
@@ -47,7 +46,7 @@ def solve(entry: MaxXorSat):
 
     for bits in itertools.product([0, 1], repeat=m):
         bits = np.array(bits)
-        
+
         # print(bits)
         res = np.dot(A, bits) % 2
         utilite = np.sum(res == b)
@@ -58,11 +57,47 @@ def solve(entry: MaxXorSat):
     return (best_solution, max_utilite)
 
 
-# Test
-entry = MaxXorSat(2,2,[[1,1],[0,1]], [0])
-solution = solve(entry)
-print("solution: " , solution[0])
-print("utlilité : " , solution[1])
+def test_solve_classical():
+    """Tests du solveur classique avec différentes instances"""
+    print("=" * 60)
+    print("TESTS SOLVEUR CLASSIQUE")
+    print("=" * 60)
+    
+    # Instance 1: Petit exemple (2 variables, 2 contraintes)
+    print("\n[Instance 1] n=2, m=2")
+    entry1 = MaxXorSat(2, 2, [[1, 1], [0, 1]], [0, 1])
+    solution1 = solve(entry1)
+    print(f"  Solution: {solution1[0]}")
+    print(f"  Utilité: {solution1[1]}/{entry1.n}")
+    
+    # Instance 2: Plus de contraintes (3 variables, 4 contraintes)
+    print("\n[Instance 2] n=3, m=4")
+    entry2 = MaxXorSat(3, 4, 
+                       [[1, 1, 0, 0],
+                        [0, 1, 1, 0],
+                        [1, 0, 1, 1]], 
+                       [1, 0, 1])
+    solution2 = solve(entry2)
+    print(f"  Solution: {solution2[0]}")
+    print(f"  Utilité: {solution2[1]}/{entry2.n}")
+    
+    # Instance 3: Système inconsistant
+    print("\n[Instance 3] Système avec contraintes conflictuelles")
+    entry3 = MaxXorSat(3, 2, 
+                       [[1, 0],
+                        [1, 0],
+                        [0, 1]], 
+                       [0, 1, 1])
+    solution3 = solve(entry3)
+    print(f"  Solution: {solution3[0]}")
+    print(f"  Utilité: {solution3[1]}/{entry3.n}")
+    
+    return [(entry1, solution1), (entry2, solution2), (entry3, solution3)]
+
+
+# Exécuter les tests classiques
+if __name__ == "__main__":
+    classical_results = test_solve_classical()
 
 
 """
@@ -71,59 +106,10 @@ print("utlilité : " , solution[1])
 ===========================================
 """
 
-
-"""
-on construit le circuit quantique a partir de l'hamiltonien et la liste de porte I,Z etc défini et de entry 
-a la question 7 - 8 (il faut utiliser SparsePauliOp.from_list([("IZZ", 1), ("IZI", 2)]), q.num_parameters)
-Rappelez vous que QAOA construit un circuit paramétré, il faut, pour le faire fonction-
-ner donner une valeur à ses paramètres. Il faut ensuite trouver le bon set de paramètres
-pour que ce circuit vous donne la meilleure solution. Vous devez donc optimiser les
-paramètres du circuit avec un algorithme classique. Vous pouvez utiliser un optimiseur
-déjà conçu pour ça.
-Commencez par récupérer le nombre de paramètres du circuit:
-q.num_parameters
-Fixez ensuite ces paramèters à des valeurs aléatoires, par exemple entre 0 et 2π.
-Il nous faut une fonction capable d’évaluer un set de paramètres params. On utilisera
-la fonction suivante (à adapter en fonction de la version de qiskit que vous utilisez):
-
-
-from qiskit.primitives import StatevectorEstimator
-def f(params):
-    #On suppose qu’on a deux variables globales.
-    #q est le circuit paramétré renvoyé par QAOAAnsatz
-    #hamiltonian est l’hamiltonien généré avec la fonction SparsePauliOp.from_list
-    pub = [q, [hamiltonian], [params]]
-    estimator = StatevectorEstimator()
-    result = estimator.run(pubs=[pub]).result()
-    cost = result[0].data.evs[0]
-    
-    return cost
-
-
-Ce circuit évalue la qualité des paramètres params au travers de l’hamiltonien. Pour
-simplifier grossièrement, la fonction estimator.run effectue les opérations suivantes:
-– Instancier les paramètres du circuit q avec les valeurs données dans la liste params
-– Exécuter le circuit q de nombreuses fois pour produire une distribution de qbits
-– Tester chaque vecteur de cette distribution sur l’hamiltonien pour déterminer la
-valeur propre moyenne sur cette distribution. Plus la valeur propre moyenne est
-petite, plus le circuit a de grandes chances de sortir une solution réalisable de bonne
-qualité.
-Plus d’informaton dans le premier TP sur qiskit.
-On peut ensuite utiliser ensuite la fonction de scipy nommée minimize pour trouver
-un bon set de paramètres.
-best_params = minimize(f, init_params, args=(), method="COBYLA").x
-Enfin, on peut rappeler f avec ces paramètres pour avoir la valeur objective finale
-ou mesurer manuellement la distribution finale et extraire la meilleure solution. Pour
-instancier manuellement les paramètres, il faut utiliser:
-q.assign_parameters
-
-"""
-
-
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import SparsePauliOp
 from qiskit.circuit.library import QAOAAnsatz
 from qiskit.primitives import StatevectorEstimator
+from qiskit.quantum_info import SparsePauliOp
 from scipy.optimize import minimize
 
 
@@ -133,43 +119,41 @@ def build_hamiltonian(entry: MaxXorSat):
     Pour chaque contrainte i: A[i] @ x = b[i] (mod 2)
     On veut maximiser le nombre de contraintes satisfaites.
     """
-    n = entry.n  
-    m = entry.m 
+    n = entry.n
+    m = entry.m
     A = entry.A
     b = entry.b
-    
+
     pauli_list = []
     # Pas certain de la suite, ça dépend de la q8 et des portes à mettre
     # TODO: Mettre les bonnes portes
-    """    
     # Pour chaque contrainte
     for i in range(n):
         pauli_string = ['PORTE QUELCONQUE 1'] * m
         coefficient = 1.0
-        
+
         for j in range(m):
             if A[i][j] == 1:
                 pauli_string[j] = 'PORTE QUELCONQUE 2'
         
         if b[i] == 1:
             coefficient = -1.0
-        """
-        
+
         # littéralement faire SparsePauliOp.from_list([("IZZ", 1), ("IZI", 2)]), à chaque bouvle on détermine ("IZZ", 1)
         # TODO: décommenter
-        # pauli_list.append((''.join(reversed(pauli_string)), coefficient))
-    
+        pauli_list.append(("".join(reversed(pauli_string)), coefficient))
+
     return SparsePauliOp.from_list(pauli_list)
 
 
 def build_quantum_circuit(entry: MaxXorSat, reps=1):
     """
     Construit le circuit QAOA pour résoudre MaxXorSat.
-    
+
     Args:
         entry: Instance de MaxXorSat
         reps: Nombre de répétitions QAOA (profondeur du circuit)
-    
+
     Returns:
         Circuit QAOA paramétré et hamiltonien
     """
@@ -181,34 +165,89 @@ def build_quantum_circuit(entry: MaxXorSat, reps=1):
 def solve_qaoa(entry: MaxXorSat, reps=1):
     """
     Résout le problème MaxXorSat avec QAOA.
-    
+
     Args:
         entry: Instance de MaxXorSat
         reps: Nombre de répétitions QAOA (profondeur du circuit), 1 par défaut
-    
+
     Returns:
         Circuit final, meilleurs paramètres, et coût optimal
     """
     q, hamiltonian = build_quantum_circuit(entry, reps=reps)
-    
+
     # Initialiser les paramètres aléatoirement entre 0 et 2π
-    init_params = np.random.uniform(0, 2*np.pi, q.num_parameters)
-    
+    init_params = np.random.uniform(0, 2 * np.pi, q.num_parameters)
+
     # évaluation
     def f(params):
-        pub = [q, [hamiltonian], [params]]
+        pub = (q, hamiltonian, params)
         estimator = StatevectorEstimator()
-        result = estimator.run(pubs=[pub]).result()
-        cost = result[0].data.evs[0]
+        job = estimator.run([pub])
+        result = job.result()
+
+        # Accès aux valeurs d'expectation via l'attribut evs du DataBin
+        # evs est un scalaire quand on passe un seul observable
+        cost = result[0].data.evs  # type: ignore
         return cost
-    
+
     # Opti
     result = minimize(f, init_params, method="COBYLA")
     best_params = result.x
     best_cost = result.fun
-    
+
     final_circuit = q.assign_parameters(best_params)
-    
+
     return final_circuit, best_params, best_cost
 
 
+def test_solve_qaoa():
+    """Tests du solveur QAOA avec différentes instances"""
+    print("\n" + "=" * 60)
+    print("TESTS SOLVEUR QAOA")
+    print("=" * 60)
+    
+    # Instance 1: Petit exemple (2 variables, 2 contraintes)
+    print("\n[Instance 1 QAOA] n=2, m=2, reps=1")
+    entry1 = MaxXorSat(2, 2, [[1, 1], [0, 1]], [0, 1])
+    try:
+        final_circuit1, best_params1, best_cost1 = solve_qaoa(entry1, reps=1)
+        print(f"  Meilleurs paramètres: {best_params1}")
+        print(f"  Coût optimal: {best_cost1}")
+    except Exception as e:
+        print(f"  Erreur: {e}")
+        print("  (Normal si l'hamiltonien n'est pas encore implémenté)")
+    
+    # Instance 2: Même instance avec plus de répétitions
+    print("\n[Instance 1 QAOA] n=2, m=2, reps=2")
+    try:
+        final_circuit2, best_params2, best_cost2 = solve_qaoa(entry1, reps=2)
+        print(f"  Meilleurs paramètres: {best_params2}")
+        print(f"  Coût optimal: {best_cost2}")
+    except Exception as e:
+        print(f"  Erreur: {e}")
+        print("  (Normal si l'hamiltonien n'est pas encore implémenté)")
+    
+    # Instance 3: Plus grande (3 variables, 3 contraintes)
+    print("\n[Instance 2 QAOA] n=3, m=3, reps=1")
+    entry3 = MaxXorSat(3, 3, 
+                       [[1, 1, 0],
+                        [0, 1, 1],
+                        [1, 0, 1]], 
+                       [1, 0, 1])
+    try:
+        final_circuit3, best_params3, best_cost3 = solve_qaoa(entry3, reps=1)
+        print(f"  Meilleurs paramètres: {best_params3}")
+        print(f"  Coût optimal: {best_cost3}")
+    except Exception as e:
+        print(f"  Erreur: {e}")
+        print("  (Normal si l'hamiltonien n'est pas encore implémenté)")
+
+
+
+
+
+# Tests QAOA et comparaisons
+if __name__ == "__main__":
+    # Tests QAOA
+    test_solve_qaoa()
+    

@@ -1,6 +1,7 @@
 # Environnement virtuel uv
 .venv/
 code/.venv/
+.zed/
 
 # Python
 __pycache__/

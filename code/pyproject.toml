@@ -1,0 +1,9 @@
+[project]
+name = "code"
+version = "0.1.0"
+description = "Projet d'IQRO"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.4.1",
+    "qiskit>=2.3.0",
+]

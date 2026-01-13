@@ -4,24 +4,42 @@ import itertools
 class MaxXorSat:
 
     def __init__(self, n  , m , A, b):
-        # A taille nxm
-        if (len(A) != n):
-            print("A n'a pas n lignes")
-        if (len(A[0]) != m):
-            print("A n'a pas m colonnes")
+        try:
+            # A taille nxm
+            if (len(A) != n):
+                print("A n'a pas n lignes")
+                raise ValueError("A n'a pas n lignes")
+            if (len(A[0]) != m):
+                print("A n'a pas m colonnes")
+                raise ValueError("A n'a pas m colonnes")
 
 
-        # b taille nx1
-        if(len(b) != n):
-            print("b n'a pas n lignes")
+            # b taille nx1
+            if(len(b) != n):
+                print("b n'a pas n lignes")
+                raise ValueError("b n'a pas n lignes")
 
-        self.n = n
-        self.m = m
-        self.A = A
-        self.b = b
+            self.n = n
+            self.m = m
+            self.A = A
+            self.b = b
+        except Exception as e:
+            print("Erreur dans la création de l'instance MaxXorSat:", e)
+
+
 
 #retourne la solution qui maximise et utilité = nombre d'égalité vérifié
 def solve(entry: MaxXorSat):
+    """
+    Solveur Basique naif par énumération
+
+    Args:
+        entry: Instance de MaxXorSat
+    
+    Returns:
+        (best_solution, max_utilite)
+
+    """
     A = np.array(entry.A)
     b = np.array(entry.b)
     n = entry.n
@@ -49,8 +67,13 @@ print("solution: " , solution[0])
 print("utlilité : " , solution[1])
 
 
+"""
+===========================================
+=========== QAOA pour MaxXorSat ===========
+===========================================
+"""
 
-from qiskit import QuantumCircuit
+
 """
 on construit le circuit quantique a partir de l'hamiltonien et la liste de porte I,Z etc défini et de entry 
 a la question 7 - 8 (il faut utiliser SparsePauliOp.from_list([("IZZ", 1), ("IZI", 2)]), q.num_parameters)
@@ -97,18 +120,95 @@ instancier manuellement les paramètres, il faut utiliser:
 q.assign_parameters
 
 """
-def build_quantum_circuit(entry: MaxXorSat):
-    n = entry.n
-    m = entry.m
+
+
+from qiskit import QuantumCircuit
+from qiskit.quantum_info import SparsePauliOp
+from qiskit.circuit.library import QAOAAnsatz
+from qiskit.primitives import StatevectorEstimator
+from scipy.optimize import minimize
+
+
+def build_hamiltonian(entry: MaxXorSat):
+    """
+    Construit l'hamiltonien pour le problème MaxXorSat.
+    Pour chaque contrainte i: A[i] @ x = b[i] (mod 2)
+    On veut maximiser le nombre de contraintes satisfaites.
+    """
+    n = entry.n  
+    m = entry.m 
     A = entry.A
     b = entry.b
+    
+    pauli_list = []
+    # Pas certain de la suite, ça dépend de la q8 et des portes à mettre
+    """    
+    # Pour chaque contrainte
+    for i in range(n):
+        pauli_string = ['I'] * m
+        coefficient = 1.0
+        
+        for j in range(m):
+            if A[i][j] == 1:
+                pauli_string[j] = 'Z'
+        
+        if b[i] == 1:
+            coefficient = -1.0
+        """
+        
+        # littéralement faire SparsePauliOp.from_list([("IZZ", 1), ("IZI", 2)]), à chaque bouvle on détermine ("IZZ", 1)
+        pauli_list.append((''.join(reversed(pauli_string)), coefficient))
+    
+    return SparsePauliOp.from_list(pauli_list)
 
-    qc = QuantumCircuit(m)
 
-    # on suppose l'hamiltonien a appliquer : [("IZZ", 1), ("IZI", 2)]?
-    # Utiliser SparsePauliOp.from_list([("IZZ", 1), ("IZI", 2)]) et QAOAAnsatz 
+def build_quantum_circuit(entry: MaxXorSat, reps=1):
+    """
+    Construit le circuit QAOA pour résoudre MaxXorSat.
+    
+    Args:
+        entry: Instance de MaxXorSat
+        reps: Nombre de répétitions QAOA (profondeur du circuit)
+    
+    Returns:
+        Circuit QAOA paramétré et hamiltonien
+    """
+    hamiltonian = build_hamiltonian(entry)
+    qc = QAOAAnsatz(hamiltonian, reps=reps)
+    return qc, hamiltonian
 
 
+def solve_qaoa(entry: MaxXorSat, reps=1):
+    """
+    Résout le problème MaxXorSat avec QAOA.
+    
+    Args:
+        entry: Instance de MaxXorSat
+        reps: Nombre de répétitions QAOA (profondeur du circuit), 1 par défaut
+    
+    Returns:
+        Circuit final, meilleurs paramètres, et coût optimal
+    """
+    q, hamiltonian = build_quantum_circuit(entry, reps=reps)
+    
+    # Initialiser les paramètres aléatoirement entre 0 et 2π
+    init_params = np.random.uniform(0, 2*np.pi, q.num_parameters)
+    
+    # évaluation
+    def f(params):
+        pub = [q, [hamiltonian], [params]]
+        estimator = StatevectorEstimator()
+        result = estimator.run(pubs=[pub]).result()
+        cost = result[0].data.evs[0]
+        return cost
+    
+    # Opti
+    result = minimize(f, init_params, method="COBYLA")
+    best_params = result.x
+    best_cost = result.fun
+    
+    final_circuit = q.assign_parameters(best_params)
+    
+    return final_circuit, best_params, best_cost
 
 
-    return qc

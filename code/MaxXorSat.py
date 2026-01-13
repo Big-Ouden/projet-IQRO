@@ -7,16 +7,13 @@ class MaxXorSat:
         try:
             # A taille nxm
             if (len(A) != n):
-                print("A n'a pas n lignes")
                 raise ValueError("A n'a pas n lignes")
             if (len(A[0]) != m):
-                print("A n'a pas m colonnes")
                 raise ValueError("A n'a pas m colonnes")
 
 
             # b taille nx1
             if(len(b) != n):
-                print("b n'a pas n lignes")
                 raise ValueError("b n'a pas n lignes")
 
             self.n = n
@@ -25,6 +22,7 @@ class MaxXorSat:
             self.b = b
         except Exception as e:
             print("Erreur dans la création de l'instance MaxXorSat:", e)
+            exit(0)
 
 
 
@@ -61,7 +59,7 @@ def solve(entry: MaxXorSat):
 
 
 # Test
-entry = MaxXorSat(2,2,[[1,1],[0,1]], [0,1])
+entry = MaxXorSat(2,2,[[1,1],[0,1]], [0])
 solution = solve(entry)
 print("solution: " , solution[0])
 print("utlilité : " , solution[1])
@@ -142,22 +140,24 @@ def build_hamiltonian(entry: MaxXorSat):
     
     pauli_list = []
     # Pas certain de la suite, ça dépend de la q8 et des portes à mettre
+    # TODO: Mettre les bonnes portes
     """    
     # Pour chaque contrainte
     for i in range(n):
-        pauli_string = ['I'] * m
+        pauli_string = ['PORTE QUELCONQUE 1'] * m
         coefficient = 1.0
         
         for j in range(m):
             if A[i][j] == 1:
-                pauli_string[j] = 'Z'
+                pauli_string[j] = 'PORTE QUELCONQUE 2'
         
         if b[i] == 1:
             coefficient = -1.0
         """
         
         # littéralement faire SparsePauliOp.from_list([("IZZ", 1), ("IZI", 2)]), à chaque bouvle on détermine ("IZZ", 1)
-        pauli_list.append((''.join(reversed(pauli_string)), coefficient))
+        # TODO: décommenter
+        # pauli_list.append((''.join(reversed(pauli_string)), coefficient))
     
     return SparsePauliOp.from_list(pauli_list)
 

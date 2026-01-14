@@ -24,6 +24,11 @@ class MaxXorSat:
             print("Erreur dans la création de l'instance MaxXorSat:", e)
             exit(0)
 
+"""
+===========================================
+=========== QAOA par énumération ==========
+===========================================
+"""
 
 # retourne la solution qui maximise et utilité = nombre d'égalité vérifié
 def solve(entry: MaxXorSat):
@@ -95,9 +100,7 @@ def test_solve_classical():
     return [(entry1, solution1), (entry2, solution2), (entry3, solution3)]
 
 
-# Exécuter les tests classiques
-if __name__ == "__main__":
-    classical_results = test_solve_classical()
+
 
 
 """
@@ -241,10 +244,139 @@ def test_solve_qaoa():
 
 
 
+"""
+===========================================
+=========== Grover pour MaxXorSat =========
+===========================================
+"""
+
+"""
+Implementer ensuite une fonction qui commence par construire L
+la liste de toutes les solutions réalisables dont le poids est supérieur
+à k. Utiliser ensuite cette fonction pour construire un oracle.
+"""
+def build_realizable_solutions(entry: MaxXorSat, k: int):
+    """
+    Construit la liste L des solutions dont l'utilité est >= k.
+    """
+    n = entry.n  # Nombre de variables (colonnes de A)
+    # m = entry.m # Nombre de contraintes (lignes de A) - Pas utilisé pour la taille de x
+    A = entry.A
+    b = entry.b
+
+    realizable_solutions = []
+    # CORRECTION : On itère sur n (variables), pas m (contraintes)
+    for bits in itertools.product([0, 1], repeat=n):
+        bits_arr = np.array(bits)
+        # Ax = b mod 2
+        res = np.dot(A, bits_arr) % 2
+        utilite = np.sum(res == b)
+        
+        if utilite >= k:
+            realizable_solutions.append(bits_arr)
+            
+    return realizable_solutions
+
+def build_grover_circuit(entry: MaxXorSat, k: int, iterations: int):
+    """
+    Construit le circuit Grover "triche" (basé sur la liste L).
+    """
+    n = entry.n  # CORRECTION : Le circuit a besoin de n qubits
+    realizable_solutions = build_realizable_solutions(entry, k)
+
+    qc = QuantumCircuit(n)
+
+    qc.h(range(n))
+
+    for _ in range(iterations):
+        
+        # --- ORACLE (Question 13 & 14) ---
+        # Marque les états présents dans la liste realizable_solutions
+        for solution in realizable_solutions:
+            # A. Préparation (X sur les 0)
+            for i in range(n):
+                if solution[i] == 0:
+                    qc.x(i)
+            
+            # B. Inversion de phase (MCZ)
+            # Implémentation H-MCX-H est valide.
+            qc.h(n - 1)
+            qc.mcx(list(range(n - 1)), n - 1) 
+            qc.h(n - 1)
+            
+            # C. Restauration (X sur les 0)
+            for i in range(n):
+                if solution[i] == 0:
+                    qc.x(i)
+
+        # --- DIFFUSEUR (Standard) ---
+        qc.h(range(n))
+        qc.x(range(n))
+        
+        # MCZ du diffuseur (2|0><0| - I)
+        qc.h(n - 1)
+        qc.mcx(list(range(n - 1)), n - 1)
+        qc.h(n - 1)
+        
+        qc.x(range(n))
+        qc.h(range(n))
+
+    qc.measure_all()
+    
+    return qc
+
+    
+
+def test_solve_grover():
+    """Tests du solveur Grover avec différentes instances"""
+    print("\n" + "=" * 60)
+    print("TESTS SOLVEUR GROVER")
+    print("=" * 60)
+    
+    # Instance 1: Petit exemple (2 variables, 2 contraintes)
+    print("\n[Instance 1 Grover] n=2, m=2, k=2, iterations=1")
+    entry1 = MaxXorSat(2, 2, [[1, 1], [0, 1]], [0, 1])
+    try:
+        grover_circuit1 = build_grover_circuit(entry1, k=2, iterations=1)
+        print(f"  Circuit Grover:\n{grover_circuit1}")
+    except Exception as e:
+        print(f"  Erreur: {e}")
+    
+    # Instance 2: Même instance avec plus d'itérations
+    print("\n[Instance 1 Grover] n=2, m=2, k=2, iterations=2")
+    try:
+        grover_circuit2 = build_grover_circuit(entry1, k=2, iterations=2)
+        print(f"  Circuit Grover:\n{grover_circuit2}")
+    except Exception as e:
+        print(f"  Erreur: {e}")
+    
+    # Instance 3: Plus grande (3 variables, 3 contraintes)
+    print("\n[Instance 2 Grover] n=3, m=3, k=3, iterations=1")
+    entry3 = MaxXorSat(3, 3, 
+                       [[1, 1, 0],
+                        [0, 1, 1],
+                        [1, 0, 1]], 
+                       [1, 0, 1])
+    try:
+        grover_circuit3 = build_grover_circuit(entry3, k=3, iterations=1)
+        print(f"  Circuit Grover:\n{grover_circuit3}")
+    except Exception as e:
+        print(f"  Erreur: {e}")
 
 
-# Tests QAOA
+
+
+
+
+"""
+===========================================
+=================== Main ==================
+===========================================
+"""
+
+# Tests QAOA et classiques
 if __name__ == "__main__":
+    # Tests classiques
+    classical_results = test_solve_classical()
     # Tests QAOA
     test_solve_qaoa()
-    

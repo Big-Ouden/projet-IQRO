@@ -152,7 +152,6 @@ def plot_results(df):
     """
     sns.set_theme(style="whitegrid")
     
-    # Création d'une figure avec plusieurs sous-graphiques
     fig, axes = plt.subplots(2, 2, figsize=(15, 12))
     fig.suptitle('Comparaison QAOA vs Grover', fontsize=16)
     

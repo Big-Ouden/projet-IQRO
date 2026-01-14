@@ -6,4 +6,6 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.4.1",
     "qiskit>=2.3.0",
+    "qiskit-aer>=0.4",
+    "scipy>=1.10",
 ]

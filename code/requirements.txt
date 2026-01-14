@@ -2,3 +2,6 @@ numpy
 qiskit
 qiskit-aer
 scipy
+pandas
+matplotlib
+seaborn

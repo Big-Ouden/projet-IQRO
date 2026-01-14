@@ -215,7 +215,6 @@ def test_solve_qaoa():
         print(f"  Coût optimal: {best_cost1}")
     except Exception as e:
         print(f"  Erreur: {e}")
-        print("  (Normal si l'hamiltonien n'est pas encore implémenté)")
     
     # Instance 2: Même instance avec plus de répétitions
     print("\n[Instance 1 QAOA] n=2, m=2, reps=2")
@@ -225,7 +224,6 @@ def test_solve_qaoa():
         print(f"  Coût optimal: {best_cost2}")
     except Exception as e:
         print(f"  Erreur: {e}")
-        print("  (Normal si l'hamiltonien n'est pas encore implémenté)")
     
     # Instance 3: Plus grande (3 variables, 3 contraintes)
     print("\n[Instance 2 QAOA] n=3, m=3, reps=1")
@@ -240,7 +238,6 @@ def test_solve_qaoa():
         print(f"  Coût optimal: {best_cost3}")
     except Exception as e:
         print(f"  Erreur: {e}")
-        print("  (Normal si l'hamiltonien n'est pas encore implémenté)")
 
 
 

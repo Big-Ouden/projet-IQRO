@@ -24,11 +24,6 @@ class MaxXorSat:
             print("Erreur dans la création de l'instance MaxXorSat:", e)
             exit(0)
 
-"""
-===========================================
-=========== QAOA par énumération ==========
-===========================================
-"""
 
 # retourne la solution qui maximise et utilité = nombre d'égalité vérifié
 def solve(entry: MaxXorSat):
@@ -100,7 +95,9 @@ def test_solve_classical():
     return [(entry1, solution1), (entry2, solution2), (entry3, solution3)]
 
 
-
+# Exécuter les tests classiques
+if __name__ == "__main__":
+    classical_results = test_solve_classical()
 
 
 """
@@ -111,7 +108,7 @@ def test_solve_classical():
 
 from qiskit import QuantumCircuit
 from qiskit.circuit.library import QAOAAnsatz
-from qiskit.primitives import StatevectorEstimator
+from qiskit.primitives import StatevectorEstimator, StatevectorSampler
 from qiskit.quantum_info import SparsePauliOp
 from scipy.optimize import minimize
 
@@ -120,7 +117,7 @@ def build_hamiltonian(entry: MaxXorSat):
     """
     Construit l'hamiltonien pour le problème MaxXorSat.
     Pour chaque contrainte i: A[i] @ x = b[i] (mod 2)
-    On veut maximiser le nombre de contraintes satisfaites.
+    On veut maximiser le nombre de contraintes satisfaites (donc minimiser les non-satisfaites).
     """
     n = entry.n
     m = entry.m
@@ -128,23 +125,37 @@ def build_hamiltonian(entry: MaxXorSat):
     b = entry.b
 
     pauli_list = []
-    # Pas certain de la suite, ça dépend de la q8 et des portes à mettre
-    # TODO: Mettre les bonnes portes
-    # Pour chaque contrainte
-    for i in range(n):
-        pauli_string = ['PORTE QUELCONQUE 1'] * m
-        coefficient = 1.0
 
-        for j in range(m):
-            if A[i][j] == 1:
-                pauli_string[j] = 'PORTE QUELCONQUE 2'
+    # Pour chaque contrainte (ligne de la matrice A)
+    for i in range(m): # Attention: itérer sur m (nombre de contraintes), pas n
+        # Initialisation de la chaîne avec l'identité partout
+        pauli_string = ['I'] * n
         
-        if b[i] == 1:
-            coefficient = -1.0
+        # Le coefficient dépend de b[i] selon la formule du rapport Q7
+        # Si b[i] = 0, on veut (1 - PROD Z)/2 -> coeff -0.5 pour le terme Z
+        # Si b[i] = 1, on veut (1 + PROD Z)/2 -> coeff +0.5 pour le terme Z
+        coefficient = 0.0
+        
+        if b[i] == 0:
+            coefficient = -0.5
+        else:
+            coefficient = 0.5
 
-        # littéralement faire SparsePauliOp.from_list([("IZZ", 1), ("IZI", 2)]), à chaque bouvle on détermine ("IZZ", 1)
-        # TODO: décommenter
+        # Construction de la chaîne de Pauli pour l'interaction
+        for j in range(n):
+            if A[i][j] == 1:
+                pauli_string[j] = 'Z' # On applique Z si la variable est dans l'équation
+        
+        # Ajout du terme d'interaction
+        # On inverse la chaîne car Qiskit utilise l'ordre little-endian (q0 à droite)
         pauli_list.append(("".join(reversed(pauli_string)), coefficient))
+        
+        # OPTIONNEL MAIS RECOMMANDÉ : Ajout du terme constant (0.5 * I)
+        # Sans cela, l'optimiseur trouvera la bonne solution (le bon état), 
+        # mais la valeur de l'énergie (cost) ne sera pas égale au nombre d'erreurs.
+        # Avec ce terme, Cost = 0 signifie "toutes les contraintes satisfaites".
+        full_identity = "I" * n
+        pauli_list.append((full_identity, 0.5))
 
     return SparsePauliOp.from_list(pauli_list)
 
@@ -174,7 +185,7 @@ def solve_qaoa(entry: MaxXorSat, reps=1):
         reps: Nombre de répétitions QAOA (profondeur du circuit), 1 par défaut
 
     Returns:
-        Circuit final, meilleurs paramètres, et coût optimal
+        solution binaire, meilleurs paramètres, coût optimal, et utilité
     """
     q, hamiltonian = build_quantum_circuit(entry, reps=reps)
 
@@ -198,9 +209,30 @@ def solve_qaoa(entry: MaxXorSat, reps=1):
     best_params = result.x
     best_cost = result.fun
 
+    # Extraire la solution binaire en échantillonnant le circuit optimisé
     final_circuit = q.assign_parameters(best_params)
+    
+    # Ajouter des mesures au circuit
+    measured_circuit = final_circuit.measure_all(inplace=False)
+    
+    # Utiliser le Sampler pour obtenir les mesures
+    sampler = StatevectorSampler()
+    job = sampler.run([measured_circuit], shots=1000)
+    result_counts = job.result()[0].data.meas.get_counts()
+    
+    # Trouver la chaîne de bits la plus probable
+    most_probable_bitstring = max(result_counts, key=result_counts.get)
+    
+    # Convertir en tableau numpy (inverser car Qiskit utilise little-endian)
+    binary_solution = np.array([int(bit) for bit in reversed(most_probable_bitstring)])
+    
+    # Calculer l'utilité (nombre de contraintes satisfaites)
+    A = np.array(entry.A)
+    b = np.array(entry.b)
+    res = np.dot(A, binary_solution) % 2
+    utilite = np.sum(res == b)
 
-    return final_circuit, best_params, best_cost
+    return binary_solution, best_params, best_cost, utilite
 
 
 def test_solve_qaoa():
@@ -213,20 +245,28 @@ def test_solve_qaoa():
     print("\n[Instance 1 QAOA] n=2, m=2, reps=1")
     entry1 = MaxXorSat(2, 2, [[1, 1], [0, 1]], [0, 1])
     try:
-        final_circuit1, best_params1, best_cost1 = solve_qaoa(entry1, reps=1)
-        print(f"  Meilleurs paramètres: {best_params1}")
+        binary_solution1, best_params1, best_cost1, utilite1 = solve_qaoa(entry1, reps=1)
+        print(f"  Solution binaire: {binary_solution1}")
+        print(f"  Utilité: {utilite1}/{entry1.n}")
         print(f"  Coût optimal: {best_cost1}")
+        print(f"  (Paramètres: {best_params1})")
     except Exception as e:
         print(f"  Erreur: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Instance 2: Même instance avec plus de répétitions
     print("\n[Instance 1 QAOA] n=2, m=2, reps=2")
     try:
-        final_circuit2, best_params2, best_cost2 = solve_qaoa(entry1, reps=2)
-        print(f"  Meilleurs paramètres: {best_params2}")
+        binary_solution2, best_params2, best_cost2, utilite2 = solve_qaoa(entry1, reps=2)
+        print(f"  Solution binaire: {binary_solution2}")
+        print(f"  Utilité: {utilite2}/{entry1.n}")
         print(f"  Coût optimal: {best_cost2}")
+        print(f"  (Paramètres: {best_params2})")
     except Exception as e:
         print(f"  Erreur: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Instance 3: Plus grande (3 variables, 3 contraintes)
     print("\n[Instance 2 QAOA] n=3, m=3, reps=1")
@@ -236,147 +276,22 @@ def test_solve_qaoa():
                         [1, 0, 1]], 
                        [1, 0, 1])
     try:
-        final_circuit3, best_params3, best_cost3 = solve_qaoa(entry3, reps=1)
-        print(f"  Meilleurs paramètres: {best_params3}")
+        binary_solution3, best_params3, best_cost3, utilite3 = solve_qaoa(entry3, reps=1)
+        print(f"  Solution binaire: {binary_solution3}")
+        print(f"  Utilité: {utilite3}/{entry3.n}")
         print(f"  Coût optimal: {best_cost3}")
+        print(f"  (Paramètres: {best_params3})")
     except Exception as e:
         print(f"  Erreur: {e}")
-
-
-
-"""
-===========================================
-=========== Grover pour MaxXorSat =========
-===========================================
-"""
-
-"""
-Implementer ensuite une fonction qui commence par construire L
-la liste de toutes les solutions réalisables dont le poids est supérieur
-à k. Utiliser ensuite cette fonction pour construire un oracle.
-"""
-def build_realizable_solutions(entry: MaxXorSat, k: int):
-    """
-    Construit la liste L des solutions dont l'utilité est >= k.
-    """
-    n = entry.n  # Nombre de variables (colonnes de A)
-    # m = entry.m # Nombre de contraintes (lignes de A) - Pas utilisé pour la taille de x
-    A = entry.A
-    b = entry.b
-
-    realizable_solutions = []
-    # CORRECTION : On itère sur n (variables), pas m (contraintes)
-    for bits in itertools.product([0, 1], repeat=n):
-        bits_arr = np.array(bits)
-        # Ax = b mod 2
-        res = np.dot(A, bits_arr) % 2
-        utilite = np.sum(res == b)
-        
-        if utilite >= k:
-            realizable_solutions.append(bits_arr)
-            
-    return realizable_solutions
-
-def build_grover_circuit(entry: MaxXorSat, k: int, iterations: int):
-    """
-    Construit le circuit Grover "triche" (basé sur la liste L).
-    """
-    n = entry.n  # CORRECTION : Le circuit a besoin de n qubits
-    realizable_solutions = build_realizable_solutions(entry, k)
-
-    qc = QuantumCircuit(n)
-
-    qc.h(range(n))
-
-    for _ in range(iterations):
-        
-        # --- ORACLE (Question 13 & 14) ---
-        # Marque les états présents dans la liste realizable_solutions
-        for solution in realizable_solutions:
-            # A. Préparation (X sur les 0)
-            for i in range(n):
-                if solution[i] == 0:
-                    qc.x(i)
-            
-            # B. Inversion de phase (MCZ)
-            # Implémentation H-MCX-H est valide.
-            qc.h(n - 1)
-            qc.mcx(list(range(n - 1)), n - 1) 
-            qc.h(n - 1)
-            
-            # C. Restauration (X sur les 0)
-            for i in range(n):
-                if solution[i] == 0:
-                    qc.x(i)
-
-        # --- DIFFUSEUR (Standard) ---
-        qc.h(range(n))
-        qc.x(range(n))
-        
-        # MCZ du diffuseur (2|0><0| - I)
-        qc.h(n - 1)
-        qc.mcx(list(range(n - 1)), n - 1)
-        qc.h(n - 1)
-        
-        qc.x(range(n))
-        qc.h(range(n))
-
-    qc.measure_all()
-    
-    return qc
-
-    
-
-def test_solve_grover():
-    """Tests du solveur Grover avec différentes instances"""
-    print("\n" + "=" * 60)
-    print("TESTS SOLVEUR GROVER")
-    print("=" * 60)
-    
-    # Instance 1: Petit exemple (2 variables, 2 contraintes)
-    print("\n[Instance 1 Grover] n=2, m=2, k=2, iterations=1")
-    entry1 = MaxXorSat(2, 2, [[1, 1], [0, 1]], [0, 1])
-    try:
-        grover_circuit1 = build_grover_circuit(entry1, k=2, iterations=1)
-        print(f"  Circuit Grover:\n{grover_circuit1}")
-    except Exception as e:
-        print(f"  Erreur: {e}")
-    
-    # Instance 2: Même instance avec plus d'itérations
-    print("\n[Instance 1 Grover] n=2, m=2, k=2, iterations=2")
-    try:
-        grover_circuit2 = build_grover_circuit(entry1, k=2, iterations=2)
-        print(f"  Circuit Grover:\n{grover_circuit2}")
-    except Exception as e:
-        print(f"  Erreur: {e}")
-    
-    # Instance 3: Plus grande (3 variables, 3 contraintes)
-    print("\n[Instance 2 Grover] n=3, m=3, k=3, iterations=1")
-    entry3 = MaxXorSat(3, 3, 
-                       [[1, 1, 0],
-                        [0, 1, 1],
-                        [1, 0, 1]], 
-                       [1, 0, 1])
-    try:
-        grover_circuit3 = build_grover_circuit(entry3, k=3, iterations=1)
-        print(f"  Circuit Grover:\n{grover_circuit3}")
-    except Exception as e:
-        print(f"  Erreur: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 
 
 
-
-"""
-===========================================
-=================== Main ==================
-===========================================
-"""
-
-# Tests QAOA et classiques
+# Tests QAOA et comparaisons
 if __name__ == "__main__":
-    # Tests classiques
-    classical_results = test_solve_classical()
     # Tests QAOA
     test_solve_qaoa()
+    

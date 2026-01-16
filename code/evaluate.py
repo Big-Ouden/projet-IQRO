@@ -194,11 +194,11 @@ def plot_results(df):
 if __name__ == "__main__":
     # Paramètres de l'évaluation
     print("Lancement de l'évaluation...")
-    n_range = (3, 15)   # Nombre de clauses
-    m_range = (3, 10)   # Nombre de variables
-    num_instances = 50  
+    n_range = (3, 5)   # Nombre de clauses
+    m_range = (3, 5)   # Nombre de variables
+    num_instances = 10 
     
-    qaoa_reps_list = [1, 2,3,4,5]
+    qaoa_reps_list = [1, 2]
     
     print(f"Génération de {num_instances} instances aléatoires (n={n_range}, m={m_range})...")
     instances = generate_random_instance_set(num_instances, n_range, m_range, seed=42)

@@ -104,3 +104,18 @@ def determine_opti_k(entry: MaxXorSat):
             high = mid - 1
             
     return best_k
+
+
+if __name__ == "__main__":
+    # Exemple d'utilisation
+    A = np.array([[1, 0, 1],
+                  [0, 1, 1],
+                  [1, 1, 0]])
+    b = np.array([1, 0, 1])
+    entry = MaxXorSat(n=3, m=3, A=A, b=b)
+    
+    k_optimal = determine_opti_k(entry)
+    print(f"Valeur k optimale: {k_optimal}")
+    
+    grover_circuit = build_grover_circuit(entry, k_optimal, iterations=1)
+    print(grover_circuit)

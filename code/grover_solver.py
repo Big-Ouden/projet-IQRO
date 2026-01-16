@@ -86,7 +86,7 @@ On pourrait donc obtenir l'optimisation en cherchant le K maximum en utilisant l
 """    
 def determine_opti_k(entry: MaxXorSat):
     """
-    Détermine une valeur k optimale pour Grover. Par dichotomie.
+    Détermine une valeur k optimale pour Grover par dichotomie.
     """
     # Dichotomie sur k entre 0 et n (nb max de contraintes satisfaisables)
     low = 0

@@ -205,7 +205,6 @@ def plot_results(df):
     plt.tight_layout()
     plt.savefig("resultats_comparaison.png")
     print("Graphiques sauvegardés dans 'resultats_comparaison.png'")
-    # plt.show() # Commenté pour éviter de bloquer si pas d'interface graphique
 
 
 """
@@ -217,11 +216,11 @@ def plot_results(df):
 if __name__ == "__main__":
     # Paramètres de l'évaluation
     print("Lancement de l'évaluation...")
-    n_range = (3, 5)  # Nombre de clauses
-    m_range = (3, 5)  # Nombre de variables
-    num_instances = 10
+    n_range = (3, 10)  # Nombre de clauses
+    m_range = (3, 10)  # Nombre de variables
+    num_instances = 20
 
-    qaoa_reps_list = [1, 2]
+    qaoa_reps_list = [ 2,3]
 
     print(
         f"Génération de {num_instances} instances aléatoires (n={n_range}, m={m_range})..."
